@@ -5,114 +5,90 @@
 package lru
 
 import (
-	"container/list"
 	"sync"
 
 	"github.com/luxfi/cache"
+	"github.com/luxfi/utils"
+	"github.com/luxfi/utils/linked"
 )
 
 var _ cache.Cacher[struct{}, struct{}] = (*Cache[struct{}, struct{}])(nil)
 
-// entry is a cache entry.
-type entry[K comparable, V any] struct {
-	key   K
-	value V
-}
-
-// Cache is a thread-safe LRU cache.
+// Cache is a key value store with bounded size. If the size is attempted to be
+// exceeded, then an element is removed from the cache before the insertion is
+// done, based on evicting the least recently used value.
 type Cache[K comparable, V any] struct {
 	lock     sync.Mutex
+	elements *linked.Hashmap[K, V]
 	size     int
-	elements map[K]*list.Element
-	order    *list.List
+
+	// onEvict is called with the key and value of an entry before eviction.
+	onEvict func(K, V)
 }
 
-// NewCache creates a new LRU cache with the specified size.
 func NewCache[K comparable, V any](size int) *Cache[K, V] {
-	if size <= 0 {
-		size = 1
-	}
+	return NewCacheWithOnEvict(size, func(K, V) {})
+}
+
+// NewCacheWithOnEvict creates a new LRU cache with the given size and eviction callback.
+func NewCacheWithOnEvict[K comparable, V any](size int, onEvict func(K, V)) *Cache[K, V] {
 	return &Cache[K, V]{
-		size:     size,
-		elements: make(map[K]*list.Element),
-		order:    list.New(),
+		elements: linked.NewHashmap[K, V](),
+		size:     max(size, 1),
+		onEvict:  onEvict,
 	}
 }
 
-// Put inserts an element into the cache.
 func (c *Cache[K, V]) Put(key K, value V) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if elem, ok := c.elements[key]; ok {
-		// Update existing entry
-		elem.Value.(*entry[K, V]).value = value
-		c.order.MoveToFront(elem)
-		return
-	}
-
-	// Evict oldest if at capacity
-	if c.order.Len() >= c.size {
-		oldest := c.order.Back()
-		if oldest != nil {
-			c.removeElement(oldest)
+	if c.elements.Len() == c.size {
+		oldestKey, oldestVal, _ := c.elements.Oldest()
+		c.elements.Delete(oldestKey)
+		if c.onEvict != nil {
+			c.onEvict(oldestKey, oldestVal)
 		}
 	}
-
-	// Add new entry
-	e := &entry[K, V]{key: key, value: value}
-	elem := c.order.PushFront(e)
-	c.elements[key] = elem
+	c.elements.Put(key, value)
 }
 
-// Get returns the entry with the key, if it exists.
 func (c *Cache[K, V]) Get(key K) (V, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if elem, ok := c.elements[key]; ok {
-		c.order.MoveToFront(elem)
-		return elem.Value.(*entry[K, V]).value, true
+	val, ok := c.elements.Get(key)
+	if !ok {
+		return utils.Zero[V](), false
 	}
-	var zero V
-	return zero, false
+	c.elements.Put(key, val) // Mark [k] as MRU.
+	return val, true
 }
 
-// Evict removes the specified entry from the cache.
-func (c *Cache[K, V]) Evict(key K) {
+func (c *Cache[K, _]) Evict(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if elem, ok := c.elements[key]; ok {
-		c.removeElement(elem)
-	}
+	c.elements.Delete(key)
 }
 
-// Flush removes all entries from the cache.
-func (c *Cache[K, V]) Flush() {
+func (c *Cache[_, _]) Flush() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.elements = make(map[K]*list.Element)
-	c.order.Init()
+	c.elements.Clear()
 }
 
-// Len returns the number of elements in the cache.
-func (c *Cache[K, V]) Len() int {
+func (c *Cache[_, _]) Len() int {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	return c.order.Len()
+
+	return c.elements.Len()
 }
 
-// PortionFilled returns fraction of cache currently filled.
-func (c *Cache[K, V]) PortionFilled() float64 {
+func (c *Cache[_, _]) PortionFilled() float64 {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	return float64(c.order.Len()) / float64(c.size)
-}
 
-func (c *Cache[K, V]) removeElement(elem *list.Element) {
-	e := elem.Value.(*entry[K, V])
-	delete(c.elements, e.key)
-	c.order.Remove(elem)
+	return float64(c.elements.Len()) / float64(c.size)
 }
