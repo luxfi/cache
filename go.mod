@@ -2,7 +2,10 @@ module github.com/luxfi/cache
 
 go 1.25
 
-require github.com/luxfi/metric v1.4.5
+require (
+	github.com/luxfi/metric v1.4.5
+	github.com/luxfi/utils v1.1.0
+)
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect

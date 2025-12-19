@@ -12,6 +12,8 @@ github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0
 github.com/kylelemons/godebug v1.1.0/go.mod h1:9/0rRGxNHcop5bhtWyNeEfOS8JIWk580+fNqagV/RAw=
 github.com/luxfi/metric v1.4.5 h1:fD6gtpzB5ebGB06/m4K7e5+tOV5RiVHSZCV+Zb8ZDxk=
 github.com/luxfi/metric v1.4.5/go.mod h1:AUQ7NSNz9WndAcr/SKnOkP7XSFFnBXOa+ihtJYfDaQY=
+github.com/luxfi/utils v1.1.0 h1:ti7HvjNwJd4ILDMERJtOAWE9mF8l+zqDVkgWnF7Agic=
+github.com/luxfi/utils v1.1.0/go.mod h1:ABqhBdGNig0CaDcnNYldv1byS0BTNi5IKPbJSPF1p98=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
