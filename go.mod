@@ -1,6 +1,6 @@
 module github.com/luxfi/cache
 
-go 1.25
+go 1.25.5
 
 require (
 	github.com/luxfi/metric v1.4.5
