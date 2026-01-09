@@ -1,33 +1,32 @@
 // Copyright (C) 2019-2025, Lux Industries, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package metercacher provides metered cache implementations.
 package metercacher
 
 import (
 	"time"
 
-	"github.com/luxfi/cache"
 	"github.com/luxfi/metric"
+
+	"github.com/luxfi/cache"
 )
 
 var _ cache.Cacher[struct{}, struct{}] = (*Cache[struct{}, struct{}])(nil)
 
-// Cache wraps a Cacher with metrics.
 type Cache[K comparable, V any] struct {
 	cache.Cacher[K, V]
+
 	metrics *cacheMetrics
 }
 
-// New creates a new metered cache wrapper.
 func New[K comparable, V any](
 	namespace string,
 	registry metric.Registry,
-	c cache.Cacher[K, V],
+	cache cache.Cacher[K, V],
 ) (*Cache[K, V], error) {
 	metrics, err := newMetrics(namespace, registry)
 	return &Cache[K, V]{
-		Cacher:  c,
+		Cacher:  cache,
 		metrics: metrics,
 	}, err
 }
@@ -61,12 +60,14 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 
 func (c *Cache[K, _]) Evict(key K) {
 	c.Cacher.Evict(key)
+
 	c.metrics.len.Set(float64(c.Cacher.Len()))
 	c.metrics.portionFilled.Set(c.Cacher.PortionFilled())
 }
 
 func (c *Cache[_, _]) Flush() {
 	c.Cacher.Flush()
+
 	c.metrics.len.Set(float64(c.Cacher.Len()))
 	c.metrics.portionFilled.Set(c.Cacher.PortionFilled())
 }
