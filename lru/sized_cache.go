@@ -1,140 +1,135 @@
-// Copyright (C) 2019-2025, Lux Industries, Inc. All rights reserved.
+// Copyright (C) 2026, Lux Partners Limited. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package lru
 
 import (
+	"container/list"
 	"sync"
 
 	"github.com/luxfi/cache"
-	"github.com/luxfi/utils"
-	"github.com/luxfi/utils/linked"
 )
 
-var _ cache.Cacher[struct{}, any] = (*SizedCache[struct{}, any])(nil)
+// SizedCache is an LRU cache bounded by total size rather than entry count.
+type SizedCache[K comparable, V any] struct {
+	mu          sync.Mutex
+	maxSize     int
+	currentSize int
+	sizeFn      func(K, V) int
+	items       map[K]*list.Element
+	lru         *list.List
+}
 
-// sizedElement is used to store the element with its size, so we don't
-// calculate the size multiple times.
-//
-// This ensures that any inconsistencies returned by the size function can not
-// corrupt the cache.
-type sizedElement[V any] struct {
+type sizedEntry[K comparable, V any] struct {
+	key   K
 	value V
 	size  int
 }
 
-// SizedCache is a key value store with bounded size. If the size is attempted
-// to be exceeded, then elements are removed from the cache until the bound is
-// honored, based on evicting the least recently used value.
-type SizedCache[K comparable, V any] struct {
-	lock        sync.Mutex
-	elements    *linked.Hashmap[K, *sizedElement[V]]
-	maxSize     int
-	currentSize int
-	size        func(K, V) int
-}
-
-func NewSizedCache[K comparable, V any](maxSize int, size func(K, V) int) *SizedCache[K, V] {
+// NewSizedCache creates a size-bounded LRU cache.
+func NewSizedCache[K comparable, V any](maxSize int, sizeFn func(K, V) int) *SizedCache[K, V] {
+	if maxSize <= 0 {
+		maxSize = 1
+	}
+	if sizeFn == nil {
+		sizeFn = func(K, V) int { return 1 }
+	}
 	return &SizedCache[K, V]{
-		elements: linked.NewHashmap[K, *sizedElement[V]](),
-		maxSize:  maxSize,
-		size:     size,
+		maxSize: maxSize,
+		sizeFn:  sizeFn,
+		items:   make(map[K]*list.Element),
+		lru:     list.New(),
 	}
 }
 
+// Put inserts or replaces a value.
 func (c *SizedCache[K, V]) Put(key K, value V) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	c.put(key, value)
-}
-
-func (c *SizedCache[K, V]) Get(key K) (V, bool) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	return c.get(key)
-}
-
-func (c *SizedCache[K, V]) Evict(key K) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	c.evict(key)
-}
-
-func (c *SizedCache[K, V]) Flush() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	c.flush()
-}
-
-func (c *SizedCache[_, _]) Len() int {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	return c.len()
-}
-
-func (c *SizedCache[_, _]) PortionFilled() float64 {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	return c.portionFilled()
-}
-
-func (c *SizedCache[K, V]) put(key K, value V) {
-	newEntrySize := c.size(key, value)
-	if newEntrySize > c.maxSize {
-		c.flush()
+	entrySize := c.sizeFn(key, value)
+	if entrySize > c.maxSize {
+		c.flushLocked()
 		return
 	}
 
-	if oldElement, ok := c.elements.Get(key); ok {
-		c.currentSize -= oldElement.size
+	if elem, ok := c.items[key]; ok {
+		oldEntry := elem.Value.(*sizedEntry[K, V])
+		c.currentSize -= oldEntry.size
+		c.lru.Remove(elem)
+		delete(c.items, key)
 	}
 
-	// Remove elements until the size of elements in the cache <= [c.maxSize].
-	for c.currentSize > c.maxSize-newEntrySize {
-		oldestKey, oldestElement, _ := c.elements.Oldest()
-		c.elements.Delete(oldestKey)
-		c.currentSize -= oldestElement.size
+	for c.currentSize > c.maxSize-entrySize {
+		back := c.lru.Back()
+		if back == nil {
+			break
+		}
+		oldEntry := back.Value.(*sizedEntry[K, V])
+		c.currentSize -= oldEntry.size
+		delete(c.items, oldEntry.key)
+		c.lru.Remove(back)
 	}
 
-	c.elements.Put(key, &sizedElement[V]{
-		value: value,
-		size:  newEntrySize,
-	})
-	c.currentSize += newEntrySize
+	e := &sizedEntry[K, V]{key: key, value: value, size: entrySize}
+	c.items[key] = c.lru.PushFront(e)
+	c.currentSize += entrySize
 }
 
-func (c *SizedCache[K, V]) get(key K) (V, bool) {
-	element, ok := c.elements.Get(key)
-	if !ok {
-		return utils.Zero[V](), false
-	}
+// Get retrieves a value and marks it as most recently used.
+func (c *SizedCache[K, V]) Get(key K) (V, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	c.elements.Put(key, element) // Mark [k] as MRU.
-	return element.value, true
+	if elem, ok := c.items[key]; ok {
+		c.lru.MoveToFront(elem)
+		return elem.Value.(*sizedEntry[K, V]).value, true
+	}
+	var zero V
+	return zero, false
 }
 
-func (c *SizedCache[K, _]) evict(key K) {
-	if element, ok := c.elements.Get(key); ok {
-		c.elements.Delete(key)
-		c.currentSize -= element.size
+// Evict removes a key from the cache.
+func (c *SizedCache[K, V]) Evict(key K) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if elem, ok := c.items[key]; ok {
+		entry := elem.Value.(*sizedEntry[K, V])
+		c.currentSize -= entry.size
+		delete(c.items, key)
+		c.lru.Remove(elem)
 	}
 }
 
-func (c *SizedCache[K, V]) flush() {
-	c.elements.Clear()
+// Flush removes all entries.
+func (c *SizedCache[K, V]) Flush() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.flushLocked()
+}
+
+func (c *SizedCache[K, V]) flushLocked() {
+	c.items = make(map[K]*list.Element)
+	c.lru.Init()
 	c.currentSize = 0
 }
 
-func (c *SizedCache[_, _]) len() int {
-	return c.elements.Len()
+// Len returns number of entries.
+func (c *SizedCache[K, V]) Len() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.items)
 }
 
-func (c *SizedCache[_, _]) portionFilled() float64 {
+// PortionFilled returns the ratio of size used to max size.
+func (c *SizedCache[K, V]) PortionFilled() float64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.maxSize == 0 {
+		return 0
+	}
 	return float64(c.currentSize) / float64(c.maxSize)
 }
+
+var _ cache.Cacher[struct{}, struct{}] = (*SizedCache[struct{}, struct{}])(nil)
