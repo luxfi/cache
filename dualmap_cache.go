@@ -17,7 +17,7 @@ type DualMapCache[K comparable, V any] struct {
 }
 
 // NewDualMapCache creates a new DualMapCache. Metrics are optional.
-func NewDualMapCache[K comparable, V any](_ *metric.MetricsRegistry) *DualMapCache[K, V] {
+func NewDualMapCache[K comparable, V any](_ metric.Registry) *DualMapCache[K, V] {
 	return &DualMapCache[K, V]{
 		items: make(map[K]V),
 	}
