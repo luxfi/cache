@@ -105,7 +105,7 @@ func (c *Cache[K, V]) Flush() {
 func (c *Cache[K, V]) PortionFilled() float64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	current := float64(c.Len())
+	current := float64(c.containerCache.Len())
 	capacity := float64(c.capacity)
 	if capacity == 0 {
 		return 0
