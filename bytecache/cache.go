@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	numShards    = 256
-	shardMask    = numShards - 1
+	numShards = 256
+	shardMask = numShards - 1
 )
 
 // Stats contains cache performance metrics.
@@ -26,11 +26,11 @@ type Stats struct {
 // Cache is a high-performance sharded LRU byte cache.
 // It provides O(1) lookups with minimal lock contention.
 type Cache struct {
-	shards      [numShards]*byteShard
-	maxBytes    int64
-	getCalls    uint64
-	setCalls    uint64
-	misses      uint64
+	shards   [numShards]*byteShard
+	maxBytes int64
+	getCalls uint64
+	setCalls uint64
+	misses   uint64
 }
 
 type byteShard struct {
