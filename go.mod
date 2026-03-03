@@ -1,6 +1,6 @@
 module github.com/luxfi/cache
 
-go 1.25.5
+go 1.26
 
 require (
 	github.com/luxfi/constants v1.4.4
