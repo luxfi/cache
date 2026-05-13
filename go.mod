@@ -1,12 +1,12 @@
 module github.com/luxfi/cache
 
-go 1.26.1
+go 1.26.3
 
 require (
 	github.com/luxfi/constants v1.4.4
 	github.com/luxfi/container v0.0.2
 	github.com/luxfi/ids v1.2.9
-	github.com/luxfi/math v1.2.3
+	github.com/luxfi/math v1.4.0
 	github.com/luxfi/metric v1.4.10
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/stretchr/testify v1.11.1
