@@ -3,11 +3,11 @@ module github.com/luxfi/cache
 go 1.26.4
 
 require (
-	github.com/luxfi/constants v1.4.4
-	github.com/luxfi/container v0.0.2
-	github.com/luxfi/ids v1.2.9
-	github.com/luxfi/math v1.4.0
-	github.com/luxfi/metric v1.4.10
+	github.com/luxfi/constants v1.6.2
+	github.com/luxfi/container v0.2.1
+	github.com/luxfi/ids v1.3.2
+	github.com/luxfi/math v1.5.1
+	github.com/luxfi/metric v1.8.1
 	github.com/spaolacci/murmur3 v1.1.0
 	github.com/stretchr/testify v1.11.1
 )
@@ -21,8 +21,8 @@ require (
 	github.com/gorilla/rpc v1.2.1 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/luxfi/accel v1.0.7 // indirect
-	github.com/luxfi/crypto v1.19.0 // indirect
-	github.com/luxfi/geth v1.16.69 // indirect
+	github.com/luxfi/crypto v1.20.2 // indirect
+	github.com/luxfi/geth v1.20.1 // indirect
 	github.com/luxfi/math/big v0.1.0 // indirect
 	github.com/luxfi/mock v0.1.0 // indirect
 	github.com/luxfi/sampler v1.1.0 // indirect
