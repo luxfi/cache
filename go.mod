@@ -4,7 +4,7 @@ go 1.26.4
 
 require (
 	github.com/luxfi/constants v1.6.2
-	github.com/luxfi/container v0.2.3
+	github.com/luxfi/container v0.2.1
 	github.com/luxfi/ids v1.3.2
 	github.com/luxfi/math v1.5.1
 	github.com/luxfi/metric v1.8.1
@@ -22,7 +22,7 @@ require (
 	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/luxfi/accel v1.2.4 // indirect
 	github.com/luxfi/crypto v1.20.2 // indirect
-	github.com/luxfi/geth v1.20.2 // indirect
+	github.com/luxfi/geth v1.20.1 // indirect
 	github.com/luxfi/math/big v0.1.0 // indirect
 	github.com/luxfi/mdns v0.1.1 // indirect
 	github.com/luxfi/mock v0.1.1 // indirect
