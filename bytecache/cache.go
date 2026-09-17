@@ -28,9 +28,9 @@ type Stats struct {
 type Cache struct {
 	shards   [numShards]*byteShard
 	maxBytes int64
-	getCalls uint64
-	setCalls uint64
-	misses   uint64
+	getCalls atomic.Uint64
+	setCalls atomic.Uint64
+	misses   atomic.Uint64
 }
 
 type byteShard struct {
@@ -54,10 +54,7 @@ func New(maxBytes int) *Cache {
 		maxBytes = 1
 	}
 	c := &Cache{maxBytes: int64(maxBytes)}
-	perShard := int64(maxBytes) / numShards
-	if perShard < 1 {
-		perShard = 1
-	}
+	perShard := max(int64(maxBytes)/numShards, 1)
 	for i := range c.shards {
 		c.shards[i] = &byteShard{
 			items:   make(map[string]*byteEntry),
@@ -111,7 +108,7 @@ func (c *Cache) Has(key []byte) bool {
 
 // HasGet returns the value and whether it exists.
 func (c *Cache) HasGet(dst, key []byte) ([]byte, bool) {
-	atomic.AddUint64(&c.getCalls, 1)
+	c.getCalls.Add(1)
 	s := c.shard(key)
 	k := string(key)
 
@@ -128,7 +125,7 @@ func (c *Cache) HasGet(dst, key []byte) ([]byte, bool) {
 	}
 	s.mu.Unlock()
 
-	atomic.AddUint64(&c.misses, 1)
+	c.misses.Add(1)
 	if dst == nil {
 		return nil, false
 	}
@@ -137,7 +134,7 @@ func (c *Cache) HasGet(dst, key []byte) ([]byte, bool) {
 
 // Get looks up a value by key, copying into dst if provided.
 func (c *Cache) Get(dst, key []byte) []byte {
-	atomic.AddUint64(&c.getCalls, 1)
+	c.getCalls.Add(1)
 	s := c.shard(key)
 	k := string(key)
 
@@ -154,7 +151,7 @@ func (c *Cache) Get(dst, key []byte) []byte {
 	}
 	s.mu.Unlock()
 
-	atomic.AddUint64(&c.misses, 1)
+	c.misses.Add(1)
 	if dst == nil {
 		return nil
 	}
@@ -168,7 +165,7 @@ func (c *Cache) GetBig(dst, key []byte) []byte {
 
 // Set stores a key/value pair.
 func (c *Cache) Set(key, value []byte) {
-	atomic.AddUint64(&c.setCalls, 1)
+	c.setCalls.Add(1)
 	s := c.shard(key)
 	k := string(key)
 	v := append([]byte(nil), value...)
@@ -227,9 +224,9 @@ func (c *Cache) UpdateStats(s *Stats) {
 	s.EntriesCount = entries
 	s.BytesSize = size
 	s.Collisions = 0
-	s.GetCalls = atomic.LoadUint64(&c.getCalls)
-	s.SetCalls = atomic.LoadUint64(&c.setCalls)
-	s.Misses = atomic.LoadUint64(&c.misses)
+	s.GetCalls = c.getCalls.Load()
+	s.SetCalls = c.setCalls.Load()
+	s.Misses = c.misses.Load()
 }
 
 // Doubly-linked list operations for LRU
